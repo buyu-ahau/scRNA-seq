@@ -1,0 +1,372 @@
+# 加载必要的库
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+# 加载qs库用于读取.qs文件
+if(!requireNamespace("qs", quietly = TRUE)) {
+  install.packages("qs")
+}
+library(qs)
+
+# 设置工作目录并加载数据
+# 使用您提供的路径
+setwd("/disk192/users_dir/buyu/1.布宇/3.布宇scATAC-seq/signac/流程1")
+
+# 加载qs格式的数据
+rna_data <- qs::qread("rna_final_annotated_new.qs")
+
+# 检查数据
+print("数据维度:")
+print(dim(rna_data))
+print("元数据列名:")
+print(head(colnames(rna_data@meta.data)))
+print("细胞类型分布:")
+print(table(rna_data$celltype_new))
+
+# 现代UMAP绘图函数 (完整版)
+plot_modern_umap <- function(seurat_obj, group_by = "seurat_clusters", 
+                            pt_size = 0.5, alpha = 1.0, 
+                            colors = NULL, label = TRUE, 
+                            downsample = FALSE, max_cells = 10000) {
+  
+  # 提取UMAP坐标
+  umap_data <- as.data.frame(seurat_obj[["umap"]]@cell.embeddings)
+  # 添加分组信息
+  umap_data$group <- seurat_obj@meta.data[[group_by]]
+  
+  # 可选的下采样以提高大数据集的性能
+  if(downsample && nrow(umap_data) > max_cells) {
+    set.seed(42) # 设置随机种子以保证可重复性
+    cells_per_group <- table(umap_data$group)
+    downsample_data <- data.frame()
+    
+    for(g in unique(umap_data$group)) {
+      group_data <- umap_data[umap_data$group == g,]
+      sample_size <- min(cells_per_group[g], max_cells/length(unique(umap_data$group)))
+      if(nrow(group_data) > sample_size) {
+        group_data <- group_data[sample(nrow(group_data), sample_size),]
+      }
+      downsample_data <- rbind(downsample_data, group_data)
+    }
+    umap_data <- downsample_data
+  }
+  
+  # 如果没有指定颜色，使用更鲜明的配色方案
+  if(is.null(colors)) {
+    # 使用更鲜明的默认颜色
+    high_contrast_colors <- c(
+      "#FF0000", # 红色 - CD8 cells
+      "#0000FF", # 蓝色 - CD4 cells
+      "#00CC00", # 绿色 - B cells  
+      "#9900CC", # 紫色 - Plasma cells
+      "#FF6600", # 橙色 - NK cells
+      "#FFCC00", # 黄色 - DC cells
+      "#663300", # 棕色 - Macrophages
+      "#FF3399", # 粉色 - Neutrophils
+      "#666666", # 灰色 - Fibroblasts
+      "#00CCCC", # 青色 - Endothelial cells
+      "#FF9933"  # 橙红色 - Epithelial cells
+    )
+    
+    n_groups <- length(unique(umap_data$group))
+    if(n_groups > length(high_contrast_colors)) {
+      colors <- colorRampPalette(high_contrast_colors)(n_groups)
+    } else {
+      colors <- high_contrast_colors[1:n_groups]
+    }
+  }
+  
+  # 创建基础图层
+  p <- ggplot(umap_data, aes(x = umap_1, y = umap_2, color = group)) +
+    # 普通点（对于大数据集，点大小和alpha可能需要调整）
+    geom_point(size = pt_size, alpha = alpha, stroke = 0) +
+    # 使用指定的颜色
+    scale_color_manual(values = colors) +
+    theme_void() +
+    theme(
+      aspect.ratio = 1,
+      legend.position = "right",
+      plot.background = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA),
+      # 增强图例可读性
+      legend.text = element_text(size = 10),
+      legend.title = element_text(size = 12, face = "bold"),
+      # 添加标题样式
+      plot.title = element_text(size = 14, face = "bold", hjust = 0.5)
+    ) +
+    coord_fixed() +
+    labs(color = "Cell Type") # 设置图例标题
+  
+  # 添加标签（可选）
+  if(label) {
+    # 计算每个群的中心点
+    label_data <- umap_data %>%
+      group_by(group) %>%
+      summarise(
+        x_coord = median(umap_1),
+        y_coord = median(umap_2),
+        .groups = 'drop'
+      )
+    
+    p <- p + 
+      geom_text(data = label_data, 
+               aes(x = x_coord, y = y_coord, label = group),
+               color = "black", size = 4, fontface = "bold",
+               inherit.aes = FALSE)
+  }
+  
+  return(p)
+}
+
+# 自定义颜色方案 - 针对您的11种细胞类型
+custom_colors <- c(
+  "CD8 cells" = "#FF0000",       # 纯红色
+  "CD4 cells" = "#0000FF",       # 纯蓝色
+  "B cells" = "#00CC00",         # 亮绿色
+  "Plasma cells" = "#9900CC",    # 深紫色
+  "NK cells" = "#FF6600",        # 亮橙色
+  "DC cells" = "#FFCC00",        # 亮黄色
+  "Macrophages" = "#663300",     # 深棕色
+  "Neutrophils" = "#FF3399",     # 亮粉色
+  "Fibroblasts" = "#666666",     # 中灰色
+  "Endothelial cells" = "#00CCCC", # 亮青色
+  "Epithelial cells" = "#FF9933"  # 亮橙色
+)
+
+# 绘制带标签的UMAP图
+p1 <- plot_modern_umap(rna_data, group_by = "celltype_new", 
+                      colors = custom_colors, pt_size = 0.5, alpha = 1.0,
+                      label = TRUE) +
+      ggtitle("Cell Type Distribution (UMAP)")
+
+# 保存图像
+ggsave("modern_umap_celltype_labeled.png", p1, width = 12, height = 10, dpi = 300)
+
+# 绘制不带标签的UMAP图
+p2 <- plot_modern_umap(rna_data, group_by = "celltype_new", 
+                      colors = custom_colors, pt_size = 0.5, alpha = 1.0,
+                      label = FALSE) +
+      ggtitle("Cell Type Distribution (UMAP)")
+
+# 保存图像
+ggsave("modern_umap_celltype_unlabeled.png", p2, width = 12, height = 10, dpi = 300)
+
+# 由于您的数据较大(~35,000个细胞)，可以考虑使用下采样版本
+p3 <- plot_modern_umap(rna_data, group_by = "celltype_new", 
+                      colors = custom_colors, pt_size = 0.5, alpha = 1.0,
+                      label = TRUE, downsample = TRUE, max_cells = 22000) +
+      ggtitle("Cell Type Distribution (UMAP) - Downsampled")
+
+# 保存下采样版本
+ggsave("modern_umap_celltype_downsampled.png", p3, width = 12, height = 10, dpi = 300)
+
+# 使用viridis颜色方案
+# 您已经加载了viridis，可以直接使用
+p_viridis <- ggplot(as.data.frame(rna_data[["umap"]]@cell.embeddings), 
+                   aes(x = umap_1, y = umap_2, color = rna_data$celltype_new)) +
+  geom_point(size = 0.5, alpha = 1.0, stroke = 0) +
+  scale_color_viridis_d(option = "plasma") +
+  theme_void() +
+  theme(
+    aspect.ratio = 1,
+    legend.position = "right",
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12, face = "bold"),
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5)
+  ) +
+  coord_fixed() +
+  labs(color = "Cell Type") +
+  ggtitle("Cell Type Distribution (Viridis)")
+
+ggsave("viridis_umap.png", p_viridis, width = 12, height = 10, dpi = 300)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# t-SNE绘制
+# 加载必要的库
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+
+# 检查是否已经运行过t-SNE
+if(!"tsne" %in% names(rna_data@reductions)) {
+  # 如果没有运行过t-SNE，先计算t-SNE降维
+  print("计算t-SNE降维...")
+  rna_data <- RunTSNE(rna_data, dims = 1:30, perplexity = 30)
+  print("t-SNE计算完成")
+} else {
+  print("使用已有的t-SNE结果")
+}
+
+# t-SNE绘图函数 - 与UMAP函数类似，但使用t-SNE坐标
+plot_modern_tsne <- function(seurat_obj, group_by = "seurat_clusters", 
+                           pt_size = 0.5, alpha = 1.0, 
+                           colors = NULL, label = TRUE, 
+                           downsample = FALSE, max_cells = 10000) {
+  
+  # 提取t-SNE坐标
+  tsne_data <- as.data.frame(seurat_obj[["tsne"]]@cell.embeddings)
+  # 添加分组信息
+  tsne_data$group <- seurat_obj@meta.data[[group_by]]
+  
+  # 可选的下采样以提高大数据集的性能
+  if(downsample && nrow(tsne_data) > max_cells) {
+    set.seed(42) # 设置随机种子以保证可重复性
+    cells_per_group <- table(tsne_data$group)
+    downsample_data <- data.frame()
+    
+    for(g in unique(tsne_data$group)) {
+      group_data <- tsne_data[tsne_data$group == g,]
+      sample_size <- min(cells_per_group[g], max_cells/length(unique(tsne_data$group)))
+      if(nrow(group_data) > sample_size) {
+        group_data <- group_data[sample(nrow(group_data), sample_size),]
+      }
+      downsample_data <- rbind(downsample_data, group_data)
+    }
+    tsne_data <- downsample_data
+  }
+  
+  # 如果没有指定颜色，使用更鲜明的配色方案
+  if(is.null(colors)) {
+    # 使用更鲜明的默认颜色
+    high_contrast_colors <- c(
+      "#FF0000", # 红色 - CD8 cells
+      "#0000FF", # 蓝色 - CD4 cells
+      "#00CC00", # 绿色 - B cells  
+      "#9900CC", # 紫色 - Plasma cells
+      "#FF6600", # 橙色 - NK cells
+      "#FFCC00", # 黄色 - DC cells
+      "#663300", # 棕色 - Macrophages
+      "#FF3399", # 粉色 - Neutrophils
+      "#666666", # 灰色 - Fibroblasts
+      "#00CCCC", # 青色 - Endothelial cells
+      "#FF9933"  # 橙红色 - Epithelial cells
+    )
+    
+    n_groups <- length(unique(tsne_data$group))
+    if(n_groups > length(high_contrast_colors)) {
+      colors <- colorRampPalette(high_contrast_colors)(n_groups)
+    } else {
+      colors <- high_contrast_colors[1:n_groups]
+    }
+  }
+  
+  # 创建基础图层 - 注意坐标轴名称不同于UMAP
+  p <- ggplot(tsne_data, aes(x = tSNE_1, y = tSNE_2, color = group)) +
+    # 普通点
+    geom_point(size = pt_size, alpha = alpha, stroke = 0) +
+    # 使用指定的颜色
+    scale_color_manual(values = colors) +
+    theme_void() +
+    theme(
+      aspect.ratio = 1,
+      legend.position = "right",
+      plot.background = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA),
+      # 增强图例可读性
+      legend.text = element_text(size = 10),
+      legend.title = element_text(size = 12, face = "bold"),
+      # 添加标题样式
+      plot.title = element_text(size = 14, face = "bold", hjust = 0.5)
+    ) +
+    coord_fixed() +
+    labs(color = "Cell Type") # 设置图例标题
+  
+  # 添加标签（可选）
+  if(label) {
+    # 计算每个群的中心点
+    label_data <- tsne_data %>%
+      group_by(group) %>%
+      summarise(
+        x_coord = median(tSNE_1),
+        y_coord = median(tSNE_2),
+        .groups = 'drop'
+      )
+    
+    p <- p + 
+      geom_text(data = label_data, 
+               aes(x = x_coord, y = y_coord, label = group),
+               color = "black", size = 4, fontface = "bold",
+               inherit.aes = FALSE)
+  }
+  
+  return(p)
+}
+
+# 使用图片中的颜色方案
+custom_colors <- c(
+  "CD8 cells" = "#ef3f33",       # 红色
+  "CD4 cells" = "#2f5885",       # 深蓝色
+  "B cells" = "#26a870",         # 绿色
+  "Plasma cells" = "#895da7",    # 紫色
+  "NK cells" = "#3c9dd7",        # 天蓝色
+  "DC cells" = "#00a18a",        # 青绿色
+  "Macrophages" = "#f69886",     # 浅红色/粉橙色
+  "Neutrophils" = "#d984b7",     # 粉紫色
+  "Fibroblasts" = "#fdc182",     # 浅橙色
+  "Endothelial cells" = "#a8d490", # 浅绿色
+  "Epithelial cells" = "#d4c1ee"   # 浅紫色(额外添加的颜色)
+)
+
+# 绘制带标签的t-SNE图
+p1_tsne <- plot_modern_tsne(rna_data, group_by = "celltype_new", 
+                          colors = custom_colors, pt_size = 0.5, alpha = 1.0,
+                          label = TRUE) +
+          ggtitle("Cell Type Distribution (t-SNE)")
+
+# 保存图像
+ggsave("modern_tsne_celltype_labeled.png", p1_tsne, width = 12, height = 10, dpi = 300)
+
+# 绘制不带标签的t-SNE图
+p2_tsne <- plot_modern_tsne(rna_data, group_by = "celltype_new", 
+                          colors = custom_colors, pt_size = 0.5, alpha = 1.0,
+                          label = FALSE) +
+          ggtitle("Cell Type Distribution (t-SNE)")
+
+# 保存图像
+ggsave("modern_tsne_celltype_unlabeled.png", p2_tsne, width = 12, height = 10, dpi = 300)
+
+# 由于您的数据较大，也可以使用下采样版本
+p3_tsne <- plot_modern_tsne(rna_data, group_by = "celltype_new", 
+                          colors = custom_colors, pt_size = 0.5, alpha = 1.0,
+                          label = TRUE, downsample = TRUE, max_cells = 22000) +
+          ggtitle("Cell Type Distribution (t-SNE) - Downsampled")
+
+# 保存下采样版本
+ggsave("modern_tsne_celltype_downsampled.png", p3_tsne, width = 12, height = 10, dpi = 300)
+
+# 如果想要并排比较UMAP和t-SNE
+if(requireNamespace("patchwork", quietly = TRUE) || install.packages("patchwork")) {
+  library(patchwork)
+  
+  # 创建UMAP图和t-SNE图（不带标签，但有标题）
+  umap_plot <- plot_modern_umap(rna_data, group_by = "celltype_new", 
+                              colors = custom_colors, pt_size = 0.3, alpha = 1.0,
+                              label = FALSE, downsample = TRUE, max_cells = 20000) +
+              ggtitle("UMAP") +
+              theme(legend.position = "none")
+  
+  tsne_plot <- plot_modern_tsne(rna_data, group_by = "celltype_new", 
+                              colors = custom_colors, pt_size = 0.3, alpha = 1.0,
+                              label = FALSE, downsample = TRUE, max_cells = 20000) +
+              ggtitle("t-SNE")
+  
+  # 组合图像并共享图例
+  combined_plot <- umap_plot + tsne_plot + plot_layout(ncol = 2)
+  
+  # 保存组合图像
+  ggsave("umap_tsne_comparison.png", combined_plot, width = 18, height = 8, dpi = 300)
+}
