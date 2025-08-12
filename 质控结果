@@ -1,147 +1,84 @@
-# Seurat对象注释与分析结果整理
+# 保存更新后的Seurat对象
+qs::qsave(rna_data, "/disk192/users_dir/buyu/1.布宇/3.布宇scATAC-seq/signac/流程1/rna_final_annotated_new.qs")
+                        seurat_clusters     celltype_new
+Day0_1_AAACCCACATAGGCGA               4      Macrophages
+Day0_1_AAACCCATCCGGGACT               8        CD4 cells
+Day0_1_AAACCCATCGCAATTG               0        CD8 cells
+Day0_1_AAACGAAAGCTCGACC               7          B cells
+Day0_1_AAACGAAAGGTTAAAC               6        CD8 cells
+Day0_1_AAACGAAAGTTGCCTA              16 Epithelial cells
 
-本文件整理了`object_annotated_gene_symbols.qs`的Seurat对象基本信息、元数据字段，以及cluster与celltype注释关系的生成脚本和对应结果。便于后续分析与查阅。
+          B cells         CD4 cells         CD8 cells          DC cells 
+             2226              1838              9450               832 
+Endothelial cells  Epithelial cells       Fibroblasts       Macrophages 
+              862               624              1131              6054 
+      Neutrophils          NK cells      Plasma cells 
+             3425               747              8141 
 
----
-
-## Seurat对象信息
-
-- 特征数（基因数）：33,029
-- 细胞数：35,330
-- 激活Assay：RNA
-- 计算的降维：pca, pca_RNA, harmony_RNA, tsne, tsne_harmony_RNA, umap, umap_harmony_RNA, tsne3, tsne3_harmony_RNA, umap3, umap3_harmony_RNA
-
----
-
-## 元数据主要字段说明
-
-| 字段名称              | 含义                |
-|----------------------|---------------------|
-| orig.ident           | 原始样本编号        |
-| nCount_RNA           | 每个细胞的RNA计数   |
-| nFeature_RNA         | 每个细胞的特征数   |
-| Groups / group       | 分组信息            |
-| percent.mito         | 线粒体基因比例      |
-| percent.hgb          | 血红蛋白基因比例    |
-| S.Score, G2M.Score   | 细胞周期分数        |
-| Phase                | 细胞周期阶段        |
-| CC.Difference        | 细胞周期分数差      |
-| RNA_snn_res.0.5      | SNN聚类分辨率       |
-| seurat_clusters      | Seurat聚类编号      |
-| celltype             | 细胞类型注释        |
-
----
-
-## R脚本：生成cluster与celltype对应关系表
-
-```r
-# 定义文件路径
-file_path <- "/disk192/users_dir/buyu/2025-7-7重新注释结果/object_annotated_gene_symbols.qs"
-
-# 使用 qread() 函数读取 .qs 文件
-# 这个文件很可能是一个Seurat对象
-sc_object <- qread(file_path)
-qs 0.27.3. Announcement: https://github.com/qsbase/qs/issues/103
-> # 打印Seurat对象的摘要信息
-# 这会显示激活的Assay、细胞数量、基因数量、降维信息等
-print(sc_object)
-An object of class Seurat 
-33029 features across 35330 samples within 1 assay 
-Active assay: RNA (33029 features, 0 variable features)
- 2 layers present: counts, data
- 11 dimensional reductions calculated: pca, pca_RNA, harmony_RNA, tsne, tsne_harmony_RNA, umap, umap_harmony_RNA, tsne3, tsne3_harmony_RNA, umap3, umap3_harmony_RNA
-> # 查看元数据的前几行，了解有哪些信息列
-head(sc_object@meta.data)
-                        orig.ident nCount_RNA nFeature_RNA Groups percent.mito
-Day0_1_AAACCCACATAGGCGA     Day0_1      10481         3022   Day0    4.3125656
-Day0_1_AAACCCATCCGGGACT     Day0_1       4734         1970   Day0    2.0278834
-Day0_1_AAACCCATCGCAATTG     Day0_1       7007         2900   Day0    2.7972028
-Day0_1_AAACGAAAGCTCGACC     Day0_1        843          679   Day0    0.4744958
-Day0_1_AAACGAAAGGTTAAAC     Day0_1       7632         3029   Day0   15.5136268
-Day0_1_AAACGAAAGTTGCCTA     Day0_1       7792         3323   Day0    2.7464066
-                        percent.hgb group     S.Score   G2M.Score Phase
-Day0_1_AAACCCACATAGGCGA  0.00000000  Day0 -0.24797287 -0.65619968    G1
-Day0_1_AAACCCATCCGGGACT  0.00000000  Day0 -0.06457320 -0.28059581    G1
-Day0_1_AAACCCATCGCAATTG  0.00000000  Day0 -0.12722984 -0.35322732    G1
-Day0_1_AAACGAAAGCTCGACC  0.00000000  Day0  0.06270087  0.02365137     S
-Day0_1_AAACGAAAGGTTAAAC  0.00000000  Day0  0.57675070  0.70242888   G2M
-Day0_1_AAACGAAAGTTGCCTA  0.01283368  Day0 -0.36228807 -0.41465378    G1
-                        CC.Difference RNA_snn_res.0.5 seurat_clusters
-Day0_1_AAACCCACATAGGCGA    0.40822680               4               4
-Day0_1_AAACCCATCCGGGACT    0.21602262               8               8
-Day0_1_AAACCCATCGCAATTG    0.22599748               0               0
-Day0_1_AAACGAAAGCTCGACC    0.03904950               7               7
-Day0_1_AAACGAAAGGTTAAAC   -0.12567818               6               6
-Day0_1_AAACGAAAGTTGCCTA    0.05236571              16              16
-                               celltype
-Day0_1_AAACCCACATAGGCGA      Macrophage
-Day0_1_AAACCCATCCGGGACT       NK-T_cell
-Day0_1_AAACCCATCGCAATTG       NK-T_cell
-Day0_1_AAACGAAAGCTCGACC     Plasma_cell
-Day0_1_AAACGAAAGGTTAAAC       NK-T_cell
-Day0_1_AAACGAAAGTTGCCTA Epithelial_cell
-> # 查看当前激活的细胞身份有哪些类别
-levels(Idents(sc_object))
-
-# 或者查看每个身份下有多少个细胞
-table(Idents(sc_object))
- [1] "0"  "1"  "2"  "3"  "4"  "5"  "6"  "7"  "8"  "9"  "10" "11" "12" "13" "14"
-[16] "15" "16" "17" "18" "19"
-
-   0    1    2    3    4    5    6    7    8    9   10   11   12   13   14   15 
-6788 4217 3924 3359 3212 2842 2662 2065 1838 1043  832  627  575  498  287  161 
-  16   17   18   19 
- 126  120   88   66 
-> 
-> # 创建一个交叉表，查看每个cluster和已有celltype注释的对应关系
-annotation_table <- table(sc_object$seurat_clusters, sc_object$celltype)
-
-# 打印这个表格
-print(annotation_table)
-    
-     B_cell DC_cell Endothelial_cell Epithelial_cell Fibroblast Macrophage
-  0       0       0                0               0          0          0
-  1    4217       0                0               0          0          0
-  2    3924       0                0               0          0          0
-  3       0       0                0               0          0          0
-  4       0       0                0               0          0       3212
-  5       0       0                0               0          0       2842
-  6       0       0                0               0          0          0
-  7       0       0                0               0          0          0
-  8       0       0                0               0          0          0
-  9       0       0                0               0       1043          0
-  10      0       0                0               0          0        832
-  11      0       0                0               0          0          0
-  12      0       0              575               0          0          0
-  13      0       0                0             498          0          0
-  14      0     287                0               0          0          0
-  15      0       0                0               0          0          0
-  16      0       0                0             126          0          0
-  17      0       0                0               0          0          0
-  18      0       0                0               0         88          0
-  19      0       0                0               0         66          0
-    
-     Neutrophil NK-T_cell Plasma_cell
-  0           0      6788           0
-  1           0         0           0
-  2           0         0           0
-  3        3359         0           0
-  4           0         0           0
-  5           0         0           0
-  6           0      2662           0
-  7           0         0        2065
-  8           0      1838           0
-  9           0         0           0
-  10          0         0           0
-  11          0       627           0
-  12          0         0           0
-  13          0         0           0
-  14          0         0           0
-  15          0         0         161
-  16          0         0           0
-  17          0         0         120
-  18          0         0           0
-  19          0         0           0
-
-
-> 可根据需要直接用上述R脚本运行，或使用csv文件进行下游分析。
+             > # 检查UMAP降维结果的结构
+str(rna_data[["umap"]])
+# 查看UMAP坐标的前几行及其列名
+head(as.data.frame(rna_data[["umap"]]@cell.embeddings))
+Formal class 'DimReduc' [package "SeuratObject"] with 9 slots
+  ..@ cell.embeddings           : num [1:35330, 1:2] 2.16 2.12 1.13 8.86 -4.5 ...
+  .. ..- attr(*, "scaled:center")= num [1:2] 0.61 0.603
+  .. ..- attr(*, "dimnames")=List of 2
+  .. .. ..$ : chr [1:35330] "Day0_1_AAACCCACATAGGCGA" "Day0_1_AAACCCATCCGGGACT" "Day0_1_AAACCCATCGCAATTG" "Day0_1_AAACGAAAGCTCGACC" ...
+  .. .. ..$ : chr [1:2] "umap_1" "umap_2"
+  ..@ feature.loadings          : num[0 , 0 ] 
+  ..@ feature.loadings.projected: num[0 , 0 ] 
+  ..@ assay.used                : chr "RNA"
+  ..@ global                    : logi TRUE
+  ..@ stdev                     : num(0) 
+  ..@ jackstraw                 :Formal class 'JackStrawData' [package "SeuratObject"] with 4 slots
+  .. .. ..@ empirical.p.values     : num[0 , 0 ] 
+  .. .. ..@ fake.reduction.scores  : num[0 , 0 ] 
+  .. .. ..@ empirical.p.values.full: num[0 , 0 ] 
+  .. .. ..@ overall.p.values       : num[0 , 0 ] 
+  ..@ misc                      :List of 1
+  .. ..$ model:List of 24
+  .. .. ..$ embedding           : num [1:35330, 1:2] 2.16 2.12 1.13 8.86 -4.5 ...
+  .. .. .. ..- attr(*, "scaled:center")= num [1:2] 0.61 0.603
+  .. .. .. ..- attr(*, "dimnames")=List of 2
+  .. .. .. .. ..$ : chr [1:35330] "Day0_1_AAACCCACATAGGCGA" "Day0_1_AAACCCATCCGGGACT" "Day0_1_AAACCCATCGCAATTG" "Day0_1_AAACGAAAGCTCGACC" ...
+  .. .. .. .. ..$ : NULL
+  .. .. ..$ scale_info          : NULL
+  .. .. ..$ search_k            : num 3000
+  .. .. ..$ local_connectivity  : int 1
+  .. .. ..$ n_epochs            : num 200
+  .. .. ..$ alpha               : num 1
+  .. .. ..$ negative_sample_rate: int 5
+  .. .. ..$ method              : chr "umap"
+  .. .. ..$ a                   : Named num 0.992
+  .. .. .. ..- attr(*, "names")= chr "a"
+  .. .. ..$ b                   : Named num 1.11
+  .. .. .. ..- attr(*, "names")= chr "b"
+  .. .. ..$ gamma               : num 1
+  .. .. ..$ approx_pow          : logi FALSE
+  .. .. ..$ metric              :List of 1
+  .. .. .. ..$ cosine:List of 1
+  .. .. .. .. ..$ ndim: int 50
+  .. .. ..$ norig_col           : int 50
+  .. .. ..$ pcg_rand            : logi TRUE
+  .. .. ..$ batch               : logi FALSE
+  .. .. ..$ opt_args            :List of 5
+  .. .. .. ..$ alpha : num 1
+  .. .. .. ..$ beta1 : num 0.5
+  .. .. .. ..$ beta2 : num 0.9
+  .. .. .. ..$ eps   : num 1e-07
+  .. .. .. ..$ method: chr "adam"
+  .. .. ..$ num_precomputed_nns : num 0
+  .. .. ..$ min_dist            : num 0.3
+  .. .. ..$ spread              : num 1
+  .. .. ..$ binary_edge_weights : logi FALSE
+  .. .. ..$ seed                : NULL
+  .. .. ..$ n_neighbors         : int 30
+  .. .. ..$ pca_models          : list()
+  ..@ key                       : chr "umap_"
+                            umap_1     umap_2
+Day0_1_AAACCCACATAGGCGA   2.160769 11.0427251
+Day0_1_AAACCCATCCGGGACT   2.123540 -0.5489093
+Day0_1_AAACCCATCGCAATTG   1.127048 -7.1547732
+Day0_1_AAACGAAAGCTCGACC   8.857249 -5.3608198
+Day0_1_AAACGAAAGGTTAAAC  -4.503539 -5.6090249
+Day0_1_AAACGAAAGTTGCCTA -14.076973  4.8855730
