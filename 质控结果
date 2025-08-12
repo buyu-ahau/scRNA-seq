@@ -1,12 +1,10 @@
-# 保存更新后的Seurat对象
-qs::qsave(rna_data, "/disk192/users_dir/buyu/1.布宇/3.布宇scATAC-seq/signac/流程1/rna_final_annotated_new.qs")
-                        seurat_clusters     celltype_new
-Day0_1_AAACCCACATAGGCGA               4      Macrophages
-Day0_1_AAACCCATCCGGGACT               8        CD4 cells
-Day0_1_AAACCCATCGCAATTG               0        CD8 cells
-Day0_1_AAACGAAAGCTCGACC               7          B cells
-Day0_1_AAACGAAAGGTTAAAC               6        CD8 cells
-Day0_1_AAACGAAAGTTGCCTA              16 Epithelial cells
+###基础信息统计
+[1] "数据维度:"
+[1] 33029 35330
+[1] "元数据列名:"
+[1] "orig.ident"   "nCount_RNA"   "nFeature_RNA" "Groups"       "percent.mito"
+[6] "percent.hgb" 
+[1] "细胞类型分布:"
 
           B cells         CD4 cells         CD8 cells          DC cells 
              2226              1838              9450               832 
@@ -14,8 +12,7 @@ Endothelial cells  Epithelial cells       Fibroblasts       Macrophages
               862               624              1131              6054 
       Neutrophils          NK cells      Plasma cells 
              3425               747              8141 
-
-             > # 检查UMAP降维结果的结构
+> # 检查UMAP降维结果的结构
 str(rna_data[["umap"]])
 # 查看UMAP坐标的前几行及其列名
 head(as.data.frame(rna_data[["umap"]]@cell.embeddings))
