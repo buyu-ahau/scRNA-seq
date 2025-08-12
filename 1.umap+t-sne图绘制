@@ -30,7 +30,7 @@ plot_modern_umap <- function(seurat_obj, group_by = "seurat_clusters",
                             colors = NULL, label = TRUE, 
                             downsample = FALSE, max_cells = 10000) {
   
-  # 提取UMAP坐标
+  # 提取UMAP坐标  
   umap_data <- as.data.frame(seurat_obj[["umap"]]@cell.embeddings)
   # 添加分组信息
   umap_data$group <- seurat_obj@meta.data[[group_by]]

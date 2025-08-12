@@ -5,7 +5,6 @@
 [1] "orig.ident"   "nCount_RNA"   "nFeature_RNA" "Groups"       "percent.mito"
 [6] "percent.hgb" 
 [1] "细胞类型分布:"
-
           B cells         CD4 cells         CD8 cells          DC cells 
              2226              1838              9450               832 
 Endothelial cells  Epithelial cells       Fibroblasts       Macrophages 
