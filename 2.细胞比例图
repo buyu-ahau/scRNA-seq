@@ -1,0 +1,248 @@
+# =============================================
+# Nature风格的细胞比例堆叠柱状图 (不使用Arial字体)
+# =============================================
+
+# 加载必要的库
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(qs)
+library(patchwork)
+library(tidyr)
+
+# 设置工作目录并加载数据
+setwd("/disk192/users_dir/buyu/1.布宇/3.布宇scATAC-seq/2025.8.14/scRNA-seq数据")
+rna_data <- qs::qread("rna_final_annotated_new.qs")
+
+# 创建输出目录
+dir.create("Nature风格图像", showWarnings = FALSE)
+
+# =============================================
+# 准备对照组和感染组数据
+# =============================================
+
+# 从细胞名称创建组别变量
+cell_names <- colnames(rna_data)
+rna_data$time_group <- "未知"
+
+# 使用细胞名称中的Day0和Day28前缀标识对照组和感染组
+rna_data$time_group[grepl("^Day0_", cell_names)] <- "Con"
+rna_data$time_group[grepl("^Day28_", cell_names)] <- "Day28"
+
+# 过滤只保留Con和Day28组的细胞
+filtered_meta <- rna_data@meta.data[rna_data$time_group %in% c("Con", "Day28"), ]
+
+# 计算每个组中各细胞类型的比例
+cell_proportions <- filtered_meta %>%
+  group_by(time_group, celltype_new) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(time_group) %>%
+  mutate(proportion = count / sum(count) * 100) %>%
+  ungroup()
+
+# =============================================
+# 自定义颜色方案和顺序
+# =============================================
+
+# 确保细胞类型顺序一致（按整体比例排序）
+overall_proportions <- cell_proportions %>%
+  group_by(celltype_new) %>%
+  summarise(overall_prop = sum(proportion), .groups = "drop") %>%
+  arrange(desc(overall_prop))
+
+# 设置因子水平以控制显示顺序
+cell_proportions$celltype_new <- factor(cell_proportions$celltype_new, 
+                                      levels = overall_proportions$celltype_new)
+
+# 使用与图片中相同的颜色方案
+custom_colors <- c(
+  "CD8 cells" = "#ef3f33",       # 红色
+  "CD4 cells" = "#2f5885",       # 深蓝色
+  "B cells" = "#26a870",         # 绿色
+  "Plasma cells" = "#895da7",    # 紫色
+  "NK cells" = "#3c9dd7",        # 天蓝色
+  "DC cells" = "#00a18a",        # 青绿色
+  "Macrophages" = "#f69886",     # 浅红色/粉橙色
+  "Neutrophils" = "#d984b7",     # 粉紫色
+  "Fibroblasts" = "#fdc182",     # 浅橙色
+  "Endothelial cells" = "#a8d490", # 浅绿色
+  "Epithelial cells" = "#d4c1ee"   # 浅紫色
+)
+
+# =============================================
+# 创建Nature风格的堆叠柱状图
+# =============================================
+
+# 1. Nature风格的堆叠柱状图 (不使用Arial字体)
+p_nature <- ggplot(cell_proportions, aes(x = time_group, y = proportion, fill = celltype_new)) +
+  # 添加主网格线（更细、更浅）
+  geom_hline(yintercept = seq(0, 100, by = 25), color = "#E5E5E5", linewidth = 0.5) +
+  # 堆叠柱状图
+  geom_bar(stat = "identity", width = 0.7, color = "white", linewidth = 0.2) +
+  # 使用自定义颜色
+  scale_fill_manual(values = custom_colors) +
+  # 设置y轴范围和断点
+  scale_y_continuous(
+    name = "Proportion (%)",
+    expand = c(0, 0),
+    limits = c(0, 102),
+    breaks = seq(0, 100, by = 25)
+  ) +
+  # 设置x轴标签
+  scale_x_discrete(labels = c("Con" = "Control", "Day28" = "Infected")) +
+  # 主题设置
+  theme_minimal() +
+  theme(
+    # 整体字体设置 - 不指定字体，使用系统默认
+    text = element_text(color = "black"),
+    
+    # 图表背景设置
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    
+    # 轴线设置
+    axis.line.x = element_line(color = "black", linewidth = 0.5),
+    axis.line.y = element_line(color = "black", linewidth = 0.5),
+    axis.ticks = element_line(color = "black", linewidth = 0.5),
+    axis.ticks.length = unit(0.2, "cm"),
+    
+    # 标题和标签设置
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(size = 14, face = "bold", margin = margin(r = 10)),
+    axis.text.x = element_text(size = 14, face = "bold", color = "black"),
+    axis.text.y = element_text(size = 12, color = "black"),
+    
+    # 图例设置
+    legend.position = "right",
+    legend.title = element_text(size = 14, face = "bold"),
+    legend.text = element_text(size = 12),
+    legend.key.size = unit(0.8, "cm"),
+    
+    # 整体布局
+    plot.margin = margin(20, 20, 20, 20),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    
+    # 移除图例框线
+    legend.background = element_rect(fill = "white", color = NA),
+    legend.box.background = element_rect(fill = "white", color = NA)
+  ) +
+  # 标题和标签
+  labs(
+    title = "Control vs. Infected Cell Type Composition",
+    fill = "Cell Type"
+  ) +
+  # 图例指南
+  guides(fill = guide_legend(ncol = 1, byrow = TRUE))
+
+# 保存为高分辨率图片
+ggsave("Nature风格图像/细胞比例_Nature风格.pdf", p_nature, width = 8, height = 7, dpi = 600)
+ggsave("Nature风格图像/细胞比例_Nature风格.png", p_nature, width = 8, height = 7, dpi = 600)
+ggsave("Nature风格图像/细胞比例_Nature风格.tiff", p_nature, width = 8, height = 7, dpi = 600, compression = "lzw")
+
+# =============================================
+# 创建可定制的版本（两组间清晰的比较）
+# =============================================
+
+# 添加一些用于比较的变量
+cell_prop_wide <- cell_proportions %>%
+  select(time_group, celltype_new, proportion) %>%
+  tidyr::pivot_wider(names_from = time_group, values_from = proportion) %>%
+  mutate(
+    Difference = Day28 - Con,
+    FoldChange = Day28 / Con,
+    Direction = ifelse(Difference > 0, "Increased", "Decreased")
+  )
+
+# 2. 高质量的并排柱状图（带有显著性指示）- 不使用Arial字体
+p_nature_compare <- ggplot(cell_proportions, aes(x = celltype_new, y = proportion, fill = time_group)) +
+  # 添加主网格线
+  geom_hline(yintercept = seq(0, max(cell_proportions$proportion, na.rm = TRUE), by = 5), 
+            color = "#E5E5E5", linewidth = 0.5) +
+  # 并排柱状图
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7, 
+          color = "white", linewidth = 0.2) +
+  # 设置颜色
+  scale_fill_manual(values = c("Con" = "#00bfc4", "Day28" = "#f7766c"),
+                    labels = c("Con" = "Control", "Day28" = "Infected")) +
+  # 坐标轴设置
+  scale_y_continuous(
+    name = "Proportion (%)",
+    expand = c(0, 0),
+    limits = c(0, max(cell_proportions$proportion, na.rm = TRUE) * 1.1)
+  ) +
+  # 旋转x轴标签，确保可读性
+  coord_flip() +
+  # 主题设置
+  theme_minimal() +
+  theme(
+    # 整体字体设置 - 不指定字体，使用系统默认
+    text = element_text(color = "black"),
+    
+    # 图表背景设置
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    
+    # 轴线设置
+    axis.line = element_line(color = "black", linewidth = 0.5),
+    axis.ticks = element_line(color = "black", linewidth = 0.5),
+    axis.ticks.length = unit(0.2, "cm"),
+    
+    # 标题和标签设置
+    axis.title.y = element_blank(),
+    axis.title.x = element_text(size = 14, face = "bold", margin = margin(t = 10)),
+    axis.text.y = element_text(size = 12, face = "bold", color = "black"),
+    axis.text.x = element_text(size = 12, color = "black"),
+    
+    # 图例设置
+    legend.position = "top",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 12, face = "bold"),
+    legend.key.size = unit(0.8, "cm"),
+    
+    # 整体布局
+    plot.margin = margin(20, 20, 20, 20),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    
+    # 移除图例框线
+    legend.background = element_rect(fill = "white", color = NA)
+  ) +
+  # 标题和标签
+  labs(
+    title = "Comparison of Cell Type Proportions",
+    x = "Proportion (%)"
+  )
+
+# 保存比较图
+ggsave("Nature风格图像/细胞比例比较_Nature风格.pdf", p_nature_compare, width = 10, height = 8, dpi = 600)
+ggsave("Nature风格图像/细胞比例比较_Nature风格.png", p_nature_compare, width = 10, height = 8, dpi = 600)
+
+# =============================================
+# 创建综合面板图（用于论文图表）
+# =============================================
+
+if(requireNamespace("patchwork", quietly = TRUE)) {
+  # 创建一个综合面板图
+  panel_plot <- (p_nature / p_nature_compare) +
+    plot_layout(heights = c(1, 1.2)) +
+    plot_annotation(
+      title = "Cell Type Composition Analysis",
+      tag_levels = "A",
+      theme = theme(
+        plot.title = element_text(size = 18, face = "bold", hjust = 0.5, margin = margin(b = 20)),
+        plot.tag = element_text(size = 16, face = "bold")
+      )
+    )
+  
+  # 保存综合面板图
+  ggsave("Nature风格图像/细胞比例_综合面板_Nature风格.pdf", panel_plot, width = 10, height = 14, dpi = 600)
+  ggsave("Nature风格图像/细胞比例_综合面板_Nature风格.png", panel_plot, width = 10, height = 14, dpi = 600)
+  ggsave("Nature风格图像/细胞比例_综合面板_Nature风格.tiff", panel_plot, width = 10, height = 14, dpi = 600, compression = "lzw")
+}
+
+print("Nature风格图像已保存在'Nature风格图像'文件夹中")
