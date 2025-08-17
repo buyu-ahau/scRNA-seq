@@ -13,7 +13,7 @@ d <- "GO_KEGG_Results"
 dir.create(d, showWarnings = FALSE)
 
 # 读取所有细胞类型
-cell_types <- c("B cells", "CD4 cells", "CD8 cells", "DC cells", "Endothelial cells", 
+cell_types <- c("B cells", "CD4 cells", "CD8 cells", "DC cells", "Endothelial cells",
                 "Epithelial cells", "Fibroblasts", "Macrophages", "Neutrophils", "NK cells", "Plasma cells")
 
 # 存储每个细胞类型的基因符号
@@ -34,23 +34,18 @@ for(cell in cell_types) {
       gene_symbols <- genes_data$gene_symbol
       valid_symbols <- gene_symbols[!is.na(gene_symbols) & gene_symbols != "" & !grepl("^ENSSSCG", gene_symbols)]
       
-      # 如果没有有效的基因符号，也尝试使用Ensembl ID
+      # 如果没有足够的有效基因符号，也尝试使用Ensembl ID
       if(length(valid_symbols) < 10) {
         cat(cell, "中没有足够的有效基因符号，尝试使用Ensembl ID\n")
-        # 也许我们可以使用Ensembl ID进行分析，或尝试映射它们
         valid_symbols <- gene_symbols[!is.na(gene_symbols) & gene_symbols != ""]
       }
       
-      # 限制基因数量（如果超过100个）
-      if(length(valid_symbols) > 100) {
-        valid_symbols <- valid_symbols[1:100]
-      }
+      # 移除了限制基因数量的代码
       
       gene_symbols_list[[cell]] <- valid_symbols
       cat("从", file_path, "中读取了", length(valid_symbols), "个有效基因符号\n")
     } else {
-      warning(paste("文件", file_path, "中没有gene_symbol列。可用的列名有:", 
-                    paste(colnames(genes_data), collapse=", ")))
+      warning(paste("文件", file_path, "中没有gene_symbol列。可用的列名有:", paste(colnames(genes_data), collapse=", ")))
     }
   } else {
     warning(paste("文件不存在:", file_path))
@@ -92,7 +87,7 @@ if(any(cell_gene_counts < 10) && file.exists("Ensembl_to_Symbol_mapping.csv")) {
         symbols <- ensembl_to_symbol[ensembl_ids]
         valid_symbols <- symbols[!is.na(symbols) & symbols != ""]
         
-        if(length(valid_symbols) > 100) valid_symbols <- valid_symbols[1:100]
+        # 移除了限制基因数量的代码
         
         if(length(valid_symbols) >= 10) {
           gene_symbols_list[[cell]] <- valid_symbols
